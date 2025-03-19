@@ -148,7 +148,7 @@ class SslCommerzPaymentController extends Controller
 
             Cart::collectTotals();
 
-            $shipping_rate = $cart->selected_shipping_rate ? $cart->selected_shipping_rate->price : 0; // shipping rate
+            $shipping_rate = $cart->selected_shipping_rate?->price ?? 0; // shipping rate
             $discount_amount = $cart->discount_amount; // discount amount
             $total_amount = $cart->grand_total; // total amount
             $information = $cart->billing_address;
