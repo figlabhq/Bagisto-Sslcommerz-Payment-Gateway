@@ -12,6 +12,7 @@ use Webkul\Sales\Repositories\OrderRepository;
 use Webkul\Sales\Repositories\OrderTransactionRepository;
 use Webkul\Sales\Transformers\OrderResource;
 use Mmrtonmoybd\Sslcommerz\Exceptions\SSLCommerzException;
+use Illuminate\Support\Facades\Log;
 
 class SslCommerzPaymentController extends Controller
 {
@@ -137,9 +138,7 @@ class SslCommerzPaymentController extends Controller
                 throw new SSLCommerzException('Cart not found or has been cleared');
             }
 
-            if ($cart->haveStockableItems() && !$cart->selected_shipping_rate) {
-                throw new SSLCommerzException('Shipping method not found or has been cleared. Please try again.');
-            }
+
 
             // Validate billing information
             if (!$cart->billing_address) {
@@ -148,7 +147,7 @@ class SslCommerzPaymentController extends Controller
 
             Cart::collectTotals();
 
-            $shipping_rate = $cart->selected_shipping_rate?->price ?? 0; // shipping rate
+            $shipping_rate = $cart?->selected_shipping_rate ?? 0; // shipping rate
             $discount_amount = $cart->discount_amount; // discount amount
             $total_amount = $cart->grand_total; // total amount
             $information = $cart->billing_address;
@@ -188,11 +187,11 @@ class SslCommerzPaymentController extends Controller
                 return redirect()->route('shop.checkout.onepage.success');
             }
         } catch (SSLCommerzException $e) {
-            \Log::error('SSLCommerz Payment Error: ' . $e->getMessage());
+            Log::error('SSLCommerz Payment Error: ' . $e->getMessage());
             session()->flash('error', $e->getMessage());
             return redirect()->route('shop.checkout.cart.index');
         } catch (\Exception $e) {
-            \Log::error('SSLCommerz Unexpected Error: ' . $e->getMessage());
+            Log::error('SSLCommerz Unexpected Error: ' . $e->getMessage());
             session()->flash('error', 'An unexpected error occurred during payment processing');
             return redirect()->route('shop.checkout.cart.index');
         }
@@ -270,12 +269,23 @@ class SslCommerzPaymentController extends Controller
                 ]);
             }
 
-            //Cart::deActivateCart();
+            Cart::deActivateCart();
         }
     }
 
     protected function savePaymentTransactionId(int $orderId, string $tran): void
     {
-        OrderPayment::where('order_id', $orderId)->update(['additional' => $tran]);
+        OrderPayment::where('order_id', $orderId)->update(['additional' => json_encode(
+            [
+                'cart_id' => $tran,
+                'sslcommerz_transaction_id' => $tran,
+                'customer' => $this->iorder->customer_id,
+                'order_id' => $this->iorder->id,
+                'payment_method' => $this->iorder->payment->method,
+                'amount' => $this->iorder->grand_total,
+                'currency' => $this->iorder->cart_currency_code,
+                'status' => 'paid',
+            ]
+        )]);
     }
 }
